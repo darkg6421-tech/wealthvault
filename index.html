@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Wealth Vault</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#06090F; --s1:#0B0F18; --s2:#101520; --s3:#161C28;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.12);
+  --gold:#C9A84C; --gold2:#E8C97A; --gold-d:rgba(201,168,76,0.08); --gold-m:rgba(201,168,76,0.16);
+  --text:#EEF2F8; --text2:#7A8A9E; --text3:#3A4A5E;
+  --green:#27AE72; --green-d:rgba(39,174,114,0.1);
+  --red:#E05555; --red-d:rgba(224,85,85,0.1);
+  --r2:16px; --r3:20px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;overflow-x:hidden;}
+.shell{max-width:420px;min-height:100vh;margin:0 auto;background:var(--bg);display:flex;flex-direction:column;position:relative;}
+@media(min-width:480px){.shell{box-shadow:0 0 80px rgba(0,0,0,.8);border-left:1px solid var(--border);border-right:1px solid var(--border);}}
+
+/* SCREENS */
+.screen{display:none;flex:1;flex-direction:column;overflow-y:auto;padding-bottom:84px;min-height:100vh;}
+.screen.active{display:flex;animation:fadeUp .3s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:420px;background:rgba(11,15,24,0.96);backdrop-filter:blur(24px);border-top:1px solid var(–border);display:flex;align-items:center;padding:10px 8px 20px;z-index:100;}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:6px 4px;border-radius:10px;border:none;background:none;transition:all .15s;}
+.bn-icon{font-size:20px;transition:transform .15s;}
+.bn-label{font-size:10px;color:var(–text2);font-weight:500;}
+.bn-item.active .bn-label{color:var(–gold);}
+.bn-item.active .bn-icon{transform:translateY(-2px);}
+.bn-center{flex:1;display:flex;justify-content:center;align-items:center;}
+.invest-fab{width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(–gold),var(–gold2));display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;color:#000;font-weight:700;box-shadow:0 0 28px rgba(201,168,76,.4);border:none;transition:transform .15s;margin-top:-14px;}
+.invest-fab:hover{transform:scale(1.07);}
+
+/* TICKER */
+.ticker-bar{background:var(–s1);border-bottom:1px solid var(–border);padding:8px 16px;display:flex;align-items:center;gap:14px;overflow:hidden;flex-shrink:0;}
+.t-live{font-size:9px;color:var(–green);letter-spacing:2px;font-family:‘JetBrains Mono’,monospace;flex-shrink:0;display:flex;align-items:center;gap:5px;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(–green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.t-items{display:flex;gap:16px;overflow:hidden;}
+.t-item{display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.t-name{font-size:10px;color:var(–text3);font-family:‘JetBrains Mono’,monospace;}
+.t-val{font-size:11px;font-family:‘JetBrains Mono’,monospace;font-weight:500;}
+.up{color:var(–green);} .dn{color:var(–red);}
+
+/* STATUS BAR */
+.status-bar{display:flex;justify-content:space-between;align-items:center;padding:14px 20px 0;font-size:11px;color:var(–text2);font-family:‘JetBrains Mono’,monospace;flex-shrink:0;}
+.status-right{display:flex;align-items:center;gap:6px;}
+
+/* VAULT CARD */
+.vault-card{margin:16px 16px 0;background:linear-gradient(145deg,#111828,#0D1420,#0A1018);border:1px solid rgba(201,168,76,.2);border-radius:var(–r3);padding:24px;position:relative;overflow:hidden;}
+.vault-card::before{content:’’;position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(201,168,76,.07) 0%,transparent 70%);pointer-events:none;}
+.vault-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;}
+.vault-greeting{font-size:13px;color:var(–text2);}
+.vault-name{font-size:18px;font-weight:700;margin-top:2px;}
+.vault-badge{display:flex;align-items:center;gap:5px;background:var(–gold-d);border:1px solid rgba(201,168,76,.2);border-radius:20px;padding:5px 10px;font-size:10px;color:var(–gold);font-weight:600;}
+.vault-label{font-size:11px;color:var(–text2);letter-spacing:1.5px;text-transform:uppercase;font-family:‘JetBrains Mono’,monospace;}
+.vault-amount{font-size:40px;font-weight:800;letter-spacing:-2px;margin:8px 0 4px;line-height:1;}
+.vault-sub{font-size:13px;color:var(–text2);}
+.vault-sub span{color:var(–green);font-weight:600;}
+.vault-divider{height:1px;background:var(–border);margin:18px 0;}
+.vault-stats{display:flex;}
+.vs-item{flex:1;text-align:center;}
+.vs-item+.vs-item{border-left:1px solid var(–border);}
+.vs-val{font-size:15px;font-weight:700;}
+.vs-lbl{font-size:10px;color:var(–text2);margin-top:2px;}
+
+/* QUICK ACTIONS */
+.qa-section{padding:20px 16px 0;}
+.section-title{font-size:11px;font-weight:600;color:var(–text2);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;font-family:‘JetBrains Mono’,monospace;}
+.qa-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.qa-btn{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(–s1);border:1px solid var(–border);border-radius:14px;padding:14px 8px;cursor:pointer;transition:all .15s;}
+.qa-btn:hover{border-color:rgba(201,168,76,.3);background:var(–gold-d);}
+.qa-icon{font-size:22px;}
+.qa-lbl{font-size:11px;font-weight:500;color:var(–text2);text-align:center;}
+
+/* SIP ALERT */
+.sip-alert{margin:16px 16px 0;background:linear-gradient(135deg,rgba(201,168,76,.07),transparent);border:1px solid rgba(201,168,76,.18);border-radius:var(–r2);padding:16px;display:flex;align-items:center;justify-content:space-between;}
+.sa-left{display:flex;align-items:center;gap:10px;}
+.sa-title{font-size:13px;font-weight:600;color:var(–gold);}
+.sa-sub{font-size:11px;color:var(–text2);margin-top:2px;}
+.sa-btn{background:var(–gold);color:#000;border:none;border-radius:8px;padding:8px 14px;font-size:11px;font-weight:700;cursor:pointer;font-family:‘Outfit’,sans-serif;white-space:nowrap;}
+
+/* FUNDS */
+.funds-section{padding:20px 16px 0;}
+.fund-item{background:var(–s1);border:1px solid var(–border);border-radius:var(–r2);padding:16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:border-color .15s;}
+.fund-item:hover{border-color:var(–border2);}
+.fi-left{display:flex;align-items:center;gap:12px;}
+.fi-logo{width:38px;height:38px;border-radius:10px;background:var(–s3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(–gold);flex-shrink:0;border:1px solid var(–border);}
+.fi-name{font-size:13px;font-weight:600;}
+.fi-sub{font-size:11px;color:var(–text2);margin-top:2px;}
+.fi-right{text-align:right;}
+.fi-val{font-size:14px;font-weight:700;}
+.fi-ret{font-size:11px;margin-top:3px;font-family:‘JetBrains Mono’,monospace;}
+
+/* PAGE HEADER */
+.page-header{padding:20px 20px 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.ph-title{font-size:22px;font-weight:800;letter-spacing:-.5px;}
+.ph-action{font-size:12px;color:var(–gold);cursor:pointer;font-weight:600;}
+
+/* PORTFOLIO */
+.port-hero{margin:16px;background:var(–s1);border:1px solid var(–border);border-radius:var(–r3);padding:22px;position:relative;overflow:hidden;}
+.port-hero::before{content:’’;position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(–gold),transparent);}
+.ph-val{font-size:36px;font-weight:800;letter-spacing:-1.5px;}
+.ph-meta{font-size:12px;color:var(–text2);margin-top:4px;}
+.ph-meta span{color:var(–green);font-weight:600;}
+.ph-stats{display:flex;gap:8px;margin-top:16px;}
+.phs{flex:1;background:var(–s2);border:1px solid var(–border);border-radius:10px;padding:12px;}
+.phs-val{font-size:16px;font-weight:700;}
+.phs-lbl{font-size:10px;color:var(–text2);margin-top:3px;}
+
+/* HOLDINGS */
+.holdings{padding:0 16px;}
+.holding-card{background:var(–s1);border:1px solid var(–border);border-radius:var(–r2);padding:16px;margin-bottom:8px;}
+.hc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.hc-name{font-size:13px;font-weight:600;}
+.hc-amc{font-size:10px;color:var(–text3);margin-top:2px;letter-spacing:1px;text-transform:uppercase;}
+.hc-value{font-size:15px;font-weight:700;text-align:right;}
+.hc-ret{font-family:‘JetBrains Mono’,monospace;font-size:11px;margin-top:2px;text-align:right;}
+.hc-bar{height:3px;border-radius:2px;background:var(–s3);}
+.hc-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(–gold),var(–gold2));}
+.hc-meta{display:flex;justify-content:space-between;margin-top:10px;font-size:11px;color:var(–text2);}
+
+/* SIP SCREEN */
+.sip-screen{padding:0 16px;}
+.sip-stat-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0;}
+.sip-stat{background:var(–s1);border:1px solid var(–border);border-radius:var(–r2);padding:16px;}
+.ss-val{font-size:20px;font-weight:800;}
+.ss-lbl{font-size:11px;color:var(–text2);margin-top:3px;}
+.sip-item{background:var(–s1);border:1px solid var(–border);border-radius:var(–r2);padding:16px;margin-bottom:8px;}
+.si-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.si-name{font-size:13px;font-weight:600;}
+.si-type{font-size:10px;color:var(–text3);margin-top:2px;text-transform:uppercase;letter-spacing:1px;}
+.si-right{text-align:right;}
+.si-amt{font-size:14px;font-weight:700;}
+.si-date{font-size:11px;color:var(–gold);margin-top:3px;}
+.si-bottom{display:flex;align-items:center;justify-content:space-between;}
+.si-progress{flex:1;margin-right:12px;}
+.si-prog-bar{height:3px;border-radius:2px;background:var(–s3);}
+.si-prog-fill{height:100%;border-radius:2px;background:var(–gold);}
+.badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;}
+.b-g{background:var(–green-d);color:var(–green);}
+.b-r{background:var(–red-d);color:var(–red);}
+.b-gold{background:var(–gold-d);color:var(–gold);}
+
+/* CALENDAR */
+.cal-card{background:var(–s1);border:1px solid var(–border);border-radius:var(–r2);padding:16px;margin-bottom:16px;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:10px;}
+.cal-h{font-size:9px;text-align:center;color:var(–text3);padding:4px 0;font-family:‘JetBrains Mono’,monospace;}
+.cal-d{aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(–text3);}
+.cal-d.sip{background:var(–gold-d);color:var(–gold);font-weight:600;border:1px solid rgba(201,168,76,.15);}
+.cal-d.today{background:var(–gold);color:#000;font-weight:700;}
+.cal-d.empty{visibility:hidden;}
+
+/* INVEST */
+.invest-tabs{display:flex;gap:6px;padding:16px 16px 0;}
+.itab{flex:1;padding:10px;border-radius:10px;text-align:center;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(–border);background:var(–s1);color:var(–text2);transition:all .15s;}
+.itab.active{background:var(–gold-d);border-color:rgba(201,168,76,.3);color:var(–gold);}
+.invest-form{padding:16px;}
+.if-label{font-size:11px;color:var(–text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+.if-input{width:100%;background:var(–s1);border:1px solid var(–border);border-radius:10px;padding:13px 16px;color:var(–text);font-size:15px;font-family:‘Outfit’,sans-serif;outline:none;transition:border-color .15s;margin-bottom:16px;}
+.if-input:focus{border-color:rgba(201,168,76,.4);}
+.amount-presets{display:flex;gap:6px;margin-bottom:16px;}
+.preset{flex:1;background:var(–s1);border:1px solid var(–border);border-radius:8px;padding:8px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;color:var(–text2);transition:all .15s;}
+.preset:hover,.preset.sel{background:var(–gold-d);border-color:rgba(201,168,76,.3);color:var(–gold);}
+.fund-selector{background:var(–s1);border:1px solid var(–border);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+.fs-item{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(–border);cursor:pointer;transition:background .15s;}
+.fs-item:last-child{border-bottom:none;}
+.fs-item:hover{background:var(–s2);}
+.fs-item.selected{background:var(–gold-d);}
+.fs-radio{width:16px;height:16px;border-radius:50%;border:2px solid var(–border2);flex-shrink:0;}
+.fs-item.selected .fs-radio{border-color:var(–gold);background:var(–gold);}
+.upi-section{background:var(–s2);border:1px solid var(–border);border-radius:12px;padding:16px;margin-bottom:16px;}
+.upi-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.upi-badge{margin-left:auto;background:var(–green-d);border:1px solid rgba(39,174,114,.2);border-radius:6px;padding:3px 8px;font-size:10px;color:var(–green);font-weight:700;}
+.btn-invest{width:100%;background:linear-gradient(135deg,var(–gold),var(–gold2));border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:700;color:#000;cursor:pointer;font-family:‘Outfit’,sans-serif;box-shadow:0 4px 20px rgba(201,168,76,.25);transition:opacity .15s;}
+.btn-invest:hover{opacity:.9;}
+
+/* CONCIERGE */
+.advisor-hero{margin:16px;background:linear-gradient(145deg,#0F1820,#0A1218);border:1px solid rgba(201,168,76,.15);border-radius:var(–r3);padding:24px;text-align:center;}
+.advisor-avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(–gold-d),var(–s3));border:2px solid rgba(201,168,76,.3);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 14px;}
+.advisor-name{font-size:20px;font-weight:800;}
+.advisor-title{font-size:12px;color:var(–text2);margin-top:3px;}
+.advisor-badge{display:inline-flex;align-items:center;gap:5px;margin-top:10px;background:var(–green-d);border:1px solid rgba(39,174,114,.2);border-radius:20px;padding:5px 12px;font-size:11px;color:var(–green);font-weight:600;}
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px;}
+.contact-btn{background:var(–s1);border:1px solid var(–border);border-radius:14px;padding:18px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:all .15s;}
+.contact-btn:hover{border-color:rgba(201,168,76,.3);}
+.contact-btn.primary{background:var(–gold-d);border-color:rgba(201,168,76,.25);grid-column:span 2;flex-direction:row;justify-content:center;gap:10px;}
+.cb-icon{font-size:24px;}
+.cb-lbl{font-size:13px;font-weight:600;}
+.cb-sub{font-size:10px;color:var(–text2);}
+.chat-preview{margin:16px;}
+.chat-list{display:flex;flex-direction:column;}
+.chat-time{font-size:10px;color:var(–text3);text-align:center;margin-bottom:8px;}
+.chat-bubble{max-width:80%;padding:11px 14px;border-radius:14px;margin-bottom:8px;font-size:13px;line-height:1.5;}
+.cb-in{background:var(–s2);border:1px solid var(–border);border-bottom-left-radius:4px;}
+.cb-out{background:var(–gold-d);border:1px solid rgba(201,168,76,.2);border-bottom-right-radius:4px;margin-left:auto;color:var(–gold2);}
+.chat-input-row{display:flex;gap:8px;}
+.chat-inp{flex:1;background:var(–s1);border:1px solid var(–border);border-radius:10px;padding:11px 14px;color:var(–text);font-size:13px;font-family:‘Outfit’,sans-serif;outline:none;}
+.chat-inp:focus{border-color:rgba(201,168,76,.3);}
+.chat-send{width:42px;height:42px;border-radius:10px;background:var(–gold);border:none;font-size:16px;cursor:pointer;flex-shrink:0;}
+
+/* LOGIN */
+.login-screen{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:32px 24px;}
+.login-glow{width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(201,168,76,.1) 0%,transparent 70%);margin:0 auto 28px;display:flex;align-items:center;justify-content:center;font-size:56px;}
+.login-title{font-size:30px;font-weight:800;letter-spacing:-1px;text-align:center;margin-bottom:6px;}
+.login-sub{font-size:13px;color:var(–text2);text-align:center;margin-bottom:32px;line-height:1.7;}
+.login-sub em{color:var(–gold);font-style:normal;font-weight:600;}
+.biometric-btn{width:100%;background:linear-gradient(135deg,var(–gold),var(–gold2));border:none;border-radius:14px;padding:18px;font-size:15px;font-weight:700;color:#000;cursor:pointer;font-family:‘Outfit’,sans-serif;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 24px rgba(201,168,76,.2);margin-bottom:12px;}
+.login-or{text-align:center;font-size:12px;color:var(–text3);margin:14px 0;}
+.input-field{width:100%;background:var(–s1);border:1px solid var(–border);border-radius:12px;padding:14px 16px;color:var(–text);font-size:14px;font-family:‘Outfit’,sans-serif;outline:none;transition:border-color .15s;margin-bottom:10px;}
+.input-field:focus{border-color:rgba(201,168,76,.4);}
+.input-field::placeholder{color:var(–text3);}
+.btn-alt{width:100%;background:var(–s1);border:1px solid var(–border);border-radius:12px;padding:14px;color:var(–text);font-size:14px;font-weight:600;cursor:pointer;font-family:‘Outfit’,sans-serif;transition:border-color .15s;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;}
+.btn-alt:hover{border-color:rgba(201,168,76,.3);}
+.secure-note{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:var(–text3);margin-top:20px;}
+
+/* OTP SCREEN */
+.otp-screen{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:32px 24px;}
+.otp-back{display:flex;align-items:center;gap:8px;color:var(–text2);font-size:13px;cursor:pointer;margin-bottom:32px;}
+.otp-title{font-size:24px;font-weight:800;margin-bottom:6px;}
+.otp-sub{font-size:13px;color:var(–text2);margin-bottom:32px;line-height:1.6;}
+.otp-sub span{color:var(–gold);font-weight:600;}
+.otp-boxes{display:flex;gap:10px;justify-content:center;margin-bottom:24px;}
+.otp-box{width:52px;height:60px;background:var(–s1);border:1px solid var(–border);border-radius:12px;text-align:center;font-size:24px;font-weight:700;color:var(–text);font-family:‘JetBrains Mono’,monospace;outline:none;transition:border-color .15s;}
+.otp-box:focus{border-color:var(–gold);}
+.otp-resend{text-align:center;font-size:12px;color:var(–text2);margin-top:16px;}
+.otp-resend span{color:var(–gold);cursor:pointer;font-weight:600;}
+
+/* LOADING */
+.loading-overlay{position:fixed;inset:0;background:rgba(6,9,15,.9);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(4px);}
+.loading-spinner{width:40px;height:40px;border:3px solid var(–border);border-top-color:var(–gold);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{color:var(–text2);font-size:13px;margin-top:12px;font-family:‘JetBrains Mono’,monospace;}
+
+/* TOAST */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(–s2);border:1px solid var(–border);border-radius:10px;padding:12px 20px;font-size:13px;z-index:1000;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;}
+.toast.success{border-color:rgba(39,174,114,.3);color:var(–green);}
+.toast.error{border-color:rgba(224,85,85,.3);color:var(–red);}
+
+/* UTILS */
+.pad{padding:0 16px;}
+.mt8{margin-top:8px;} .mt16{margin-top:16px;} .mt20{margin-top:20px;}
+.row{display:flex;align-items:center;justify-content:space-between;}
+.mono{font-family:‘JetBrains Mono’,monospace;}
+.hidden{display:none !important;}
+</style>
+
+</head>
+<body>
+
+<!-- CONFIG — REPLACE WITH YOUR SUPABASE DETAILS -->
+
+<script>
+const SUPABASE_URL = 'https://lcopkpwateqlegiecojb.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_gNZVvWNupZBxNePA1HVZ8A_7oObKgxW';
+const ADVISOR_NAME = 'Mr. Sharma';
+const ADVISOR_PHONE = '+91 98765 43210';
+const ADVISOR_WHATSAPP = '919876543210';
+</script>
+
+<!-- LOADING -->
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div style="text-align:center">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Loading Wealth Vault...</div>
+  </div>
+</div>
+
+<!-- TOAST -->
+
+<div class="toast" id="toast"></div>
+
+<!-- ══ LOGIN SHELL ══ -->
+
+<div class="shell" id="loginShell" style="display:none">
+  <div class="login-screen">
+    <div class="login-glow">🏛️</div>
+    <div class="login-title">Wealth Vault</div>
+    <div class="login-sub">Your personal <em>elite investment command center.</em><br>All your funds. One secure app.</div>
+    <input class="input-field" type="email" id="loginEmail" placeholder="Enter your email address">
+    <button class="btn-alt" style="background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;border:none;font-size:15px;font-weight:700;padding:16px;" onclick="sendOTP()">
+      📱 &nbsp;Send OTP to Email
+    </button>
+    <div class="secure-note">🔐 &nbsp;256-bit encrypted &nbsp;·&nbsp; SEBI & RBI compliant</div>
+  </div>
+</div>
+
+<!-- ══ OTP SHELL ══ -->
+
+<div class="shell" id="otpShell" style="display:none">
+  <div class="otp-screen">
+    <div class="otp-back" onclick="showLogin()">← Back</div>
+    <div class="otp-title">Enter OTP</div>
+    <div class="otp-sub">We sent a 6-digit code to<br><span id="otpEmailDisplay"></span></div>
+    <div class="otp-boxes">
+      <input class="otp-box" maxlength="1" id="o1" oninput="otpNext(this,'o2')">
+      <input class="otp-box" maxlength="1" id="o2" oninput="otpNext(this,'o3')">
+      <input class="otp-box" maxlength="1" id="o3" oninput="otpNext(this,'o4')">
+      <input class="otp-box" maxlength="1" id="o4" oninput="otpNext(this,'o5')">
+      <input class="otp-box" maxlength="1" id="o5" oninput="otpNext(this,'o6')">
+      <input class="otp-box" maxlength="1" id="o6" oninput="otpSubmit(this)">
+    </div>
+    <button class="btn-alt" style="background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;border:none;font-size:15px;font-weight:700;padding:16px;" onclick="verifyOTP()">
+      Verify & Login →
+    </button>
+    <div class="otp-resend">Didn't receive? <span onclick="sendOTP()">Resend OTP</span></div>
+  </div>
+</div>
+
+<!-- ══ APP SHELL ══ -->
+
+<div class="shell" id="appShell" style="display:none">
+
+  <!-- TICKER -->
+
+  <div class="ticker-bar">
+    <div class="t-live"><div class="live-dot"></div>LIVE NAV</div>
+    <div class="t-items" id="navTicker">
+      <div class="t-item"><span class="t-name">LOADING</span><span class="t-val">...</span></div>
+    </div>
+  </div>
+
+  <!-- HOME -->
+
+  <div class="screen active" id="scr-home">
+    <div class="status-bar">
+      <span id="todayDate">—</span>
+      <div class="status-right"><div class="live-dot"></div><span>AMFI Synced</span></div>
+    </div>
+    <div class="vault-card">
+      <div class="vault-top">
+        <div>
+          <div class="vault-greeting">Good Morning 👋</div>
+          <div class="vault-name" id="clientName">Loading...</div>
+        </div>
+        <div class="vault-badge">⭐ ELITE CLIENT</div>
+      </div>
+      <div class="vault-label">Total Portfolio Value</div>
+      <div class="vault-amount" id="totalValue">—</div>
+      <div class="vault-sub">Invested <span id="investedAmt" style="color:var(--text2);font-weight:400">—</span> &nbsp;·&nbsp; Gain <span id="gainAmt">—</span></div>
+      <div class="vault-divider"></div>
+      <div class="vault-stats">
+        <div class="vs-item"><div class="vs-val up" id="absReturn">—</div><div class="vs-lbl">Returns</div></div>
+        <div class="vs-item"><div class="vs-val" style="color:var(--gold)" id="xirrVal">—</div><div class="vs-lbl">XIRR p.a.</div></div>
+        <div class="vs-item"><div class="vs-val" id="activeSips">—</div><div class="vs-lbl">Active SIPs</div></div>
+      </div>
+    </div>
+    <div class="sip-alert" id="sipAlertBox">
+      <div class="sa-left">
+        <div style="font-size:22px">⏰</div>
+        <div>
+          <div class="sa-title">SIP Due Soon</div>
+          <div class="sa-sub" id="sipAlertText">Loading...</div>
+        </div>
+      </div>
+      <button class="sa-btn" onclick="goTo('sip')">View</button>
+    </div>
+    <div class="qa-section">
+      <div class="section-title">Quick Actions</div>
+      <div class="qa-grid">
+        <div class="qa-btn" onclick="goTo('invest')"><div class="qa-icon">💰</div><div class="qa-lbl">Invest Now</div></div>
+        <div class="qa-btn" onclick="goTo('portfolio')"><div class="qa-icon">📊</div><div class="qa-lbl">Portfolio</div></div>
+        <div class="qa-btn" onclick="goTo('sip')"><div class="qa-icon">↻</div><div class="qa-lbl">My SIPs</div></div>
+        <div class="qa-btn" onclick="goTo('concierge')"><div class="qa-icon">🎯</div><div class="qa-lbl">Advisor</div></div>
+      </div>
+    </div>
+    <div class="funds-section">
+      <div class="row"><div class="section-title">My Funds</div><span style="font-size:11px;color:var(--gold);cursor:pointer;font-weight:600" onclick="goTo('portfolio')">View All →</span></div>
+      <div id="fundsList"><div style="color:var(--text2);font-size:13px;padding:20px 0;text-align:center">Loading funds...</div></div>
+    </div>
+  </div>
+
+  <!-- PORTFOLIO -->
+
+  <div class="screen" id="scr-portfolio">
+    <div class="page-header mt8"><div class="ph-title">My Portfolio</div></div>
+    <div class="port-hero">
+      <div class="vault-label">Portfolio Value</div>
+      <div class="ph-val" id="p-totalVal">—</div>
+      <div class="ph-meta">Invested <span id="p-invested" style="color:var(--text2);font-weight:400">—</span> &nbsp;·&nbsp; Gain <span id="p-gain">—</span></div>
+      <div class="ph-stats">
+        <div class="phs"><div class="phs-val up" id="p-abs">—</div><div class="phs-lbl">Absolute Return</div></div>
+        <div class="phs"><div class="phs-val" style="color:var(--gold)" id="p-xirr">—</div><div class="phs-lbl">XIRR p.a.</div></div>
+        <div class="phs"><div class="phs-val" id="p-funds">—</div><div class="phs-lbl">Funds</div></div>
+      </div>
+    </div>
+    <div class="holdings pad">
+      <div class="section-title mt16" style="margin-bottom:10px">Holdings</div>
+      <div id="holdingsList"><div style="color:var(--text2);font-size:13px;padding:20px 0;text-align:center">Loading holdings...</div></div>
+    </div>
+  </div>
+
+  <!-- SIP -->
+
+  <div class="screen" id="scr-sip">
+    <div class="page-header mt8"><div class="ph-title">SIP Manager</div></div>
+    <div class="sip-screen">
+      <div class="sip-stat-row">
+        <div class="sip-stat"><div class="ss-val up" id="s-monthly">—</div><div class="ss-lbl">Monthly SIP Total</div></div>
+        <div class="sip-stat"><div class="ss-val" style="color:var(--gold)" id="s-active">—</div><div class="ss-lbl">Active Plans</div></div>
+      </div>
+      <div class="section-title" style="margin-bottom:10px">Active Plans</div>
+      <div id="sipList"><div style="color:var(--text2);font-size:13px;padding:20px 0;text-align:center">Loading SIPs...</div></div>
+    </div>
+  </div>
+
+  <!-- INVEST -->
+
+  <div class="screen" id="scr-invest">
+    <div class="page-header mt8"><div class="ph-title">Invest</div><span style="font-size:11px;color:var(--text2)">Single tap. Zero friction.</span></div>
+    <div class="invest-tabs">
+      <div class="itab active" onclick="selTab(this)">SIP</div>
+      <div class="itab" onclick="selTab(this)">Lumpsum</div>
+      <div class="itab" onclick="selTab(this)">SWP</div>
+    </div>
+    <div class="invest-form">
+      <div class="if-label">Select Fund</div>
+      <div class="fund-selector" id="investFundList">
+        <div style="padding:16px;color:var(--text2);font-size:13px">Loading funds...</div>
+      </div>
+      <div class="if-label">Amount</div>
+      <input class="if-input" type="number" id="investAmount" placeholder="₹0">
+      <div class="amount-presets">
+        <div class="preset" onclick="setAmt(1000)">₹1K</div>
+        <div class="preset" onclick="setAmt(5000)">₹5K</div>
+        <div class="preset" onclick="setAmt(10000)">₹10K</div>
+        <div class="preset" onclick="setAmt(25000)">₹25K</div>
+      </div>
+      <div class="if-label">SIP Date</div>
+      <input class="if-input" type="text" id="sipDate" placeholder="e.g. 15th of every month">
+      <div class="upi-section">
+        <div class="upi-row">
+          <div style="font-size:20px">⚡</div>
+          <div><div style="font-size:13px;font-weight:600">Request via WhatsApp</div><div style="font-size:11px;color:var(--text2)">Your advisor will process this immediately</div></div>
+          <div class="upi-badge">INSTANT</div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);border-top:1px solid var(--border);padding-top:10px">
+          Tap below to send your investment request directly to your advisor on WhatsApp.
+        </div>
+      </div>
+      <button class="btn-invest" onclick="sendInvestRequest()">💬 &nbsp;Send Investment Request</button>
+      <div style="text-align:center;font-size:11px;color:var(--text3);margin-top:12px">🔐 &nbsp;Processed by your certified MFD advisor</div>
+    </div>
+  </div>
+
+  <!-- CONCIERGE -->
+
+  <div class="screen" id="scr-concierge">
+    <div class="page-header mt8"><div class="ph-title">Your Advisor</div></div>
+    <div class="advisor-hero">
+      <div class="advisor-avatar">👨‍💼</div>
+      <div class="advisor-name" id="advisorNameDisplay">Mr. Sharma</div>
+      <div class="advisor-title">Certified MFD &nbsp;·&nbsp; Your Personal Advisor</div>
+      <div class="advisor-badge"><div class="live-dot"></div>&nbsp; Available Now</div>
+    </div>
+    <div class="contact-grid">
+      <div class="contact-btn primary" onclick="contactWhatsApp()">
+        <div class="cb-icon">💬</div>
+        <div><div class="cb-lbl">WhatsApp Chat</div><div class="cb-sub">Instant response guaranteed</div></div>
+      </div>
+      <div class="contact-btn" onclick="contactCall()">
+        <div class="cb-icon">📞</div>
+        <div class="cb-lbl">Call Now</div>
+        <div class="cb-sub">Direct line</div>
+      </div>
+      <div class="contact-btn" onclick="contactWhatsApp()">
+        <div class="cb-icon">📅</div>
+        <div class="cb-lbl">Schedule</div>
+        <div class="cb-sub">Book a meeting</div>
+      </div>
+    </div>
+    <div class="chat-preview">
+      <div class="section-title mt16" style="margin-bottom:12px">Send a Message</div>
+      <div class="chat-list" id="chatMessages">
+        <div class="chat-time">Quick message to your advisor</div>
+        <div class="chat-bubble cb-in">Hello! How can I help you today? Feel free to ask about your portfolio, SIPs, or any investment queries.</div>
+      </div>
+      <div class="chat-input-row mt8">
+        <input class="chat-inp" id="chatInput" placeholder="Type your message..." onkeypress="if(event.key==='Enter')sendChat()">
+        <button class="chat-send" onclick="sendChat()">→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+
+  <nav class="bottom-nav">
+    <button class="bn-item active" id="bn-home" onclick="goTo('home')"><div class="bn-icon">⊞</div><div class="bn-label">Home</div></button>
+    <button class="bn-item" id="bn-portfolio" onclick="goTo('portfolio')"><div class="bn-icon">📊</div><div class="bn-label">Portfolio</div></button>
+    <div class="bn-center"><button class="invest-fab" onclick="goTo('invest')">＋</button></div>
+    <button class="bn-item" id="bn-sip" onclick="goTo('sip')"><div class="bn-icon">↻</div><div class="bn-label">SIPs</div></button>
+    <button class="bn-item" id="bn-concierge" onclick="goTo('concierge')"><div class="bn-icon">🎯</div><div class="bn-label">Advisor</div></button>
+  </nav>
+</div>
+
+<script>
+// ══════════════════════════════
+// SUPABASE INIT
+// ══════════════════════════════
+const { createClient } = supabase;
+let sb, currentUser, clientData, portfolioData, sipData;
+
+async function initApp() {
+  try {
+    sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      currentUser = session.user;
+      await loadClientApp();
+    } else {
+      showLogin();
+    }
+  } catch(e) {
+    showLogin();
+  }
+  hide('loadingOverlay');
+}
+
+// ══════════════════════════════
+// AUTH
+// ══════════════════════════════
+async function sendOTP() {
+  const email = document.getElementById('loginEmail').value.trim();
+  if (!email) { showToast('Please enter your email', 'error'); return; }
+  show('loadingOverlay');
+  try {
+    const { error } = await sb.auth.signInWithOtp({ email });
+    if (error) throw error;
+    document.getElementById('otpEmailDisplay').textContent = email;
+    hide('loginShell'); hide('otpShell');
+    document.getElementById('otpShell').style.display = 'flex';
+    showToast('OTP sent to ' + email, 'success');
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+  hide('loadingOverlay');
+}
+
+async function verifyOTP() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const otp = ['o1','o2','o3','o4','o5','o6'].map(id => document.getElementById(id).value).join('');
+  if (otp.length < 6) { showToast('Enter 6-digit OTP', 'error'); return; }
+  show('loadingOverlay');
+  try {
+    const { data, error } = await sb.auth.verifyOtp({ email, token: otp, type: 'email' });
+    if (error) throw error;
+    currentUser = data.user;
+    await loadClientApp();
+  } catch(e) {
+    showToast('Invalid OTP. Try again.', 'error');
+  }
+  hide('loadingOverlay');
+}
+
+function showLogin() {
+  hide('loadingOverlay'); hide('otpShell'); hide('appShell');
+  document.getElementById('loginShell').style.display = 'flex';
+}
+
+// ══════════════════════════════
+// LOAD DATA
+// ══════════════════════════════
+async function loadClientApp() {
+  show('loadingOverlay');
+  try {
+    // Get client profile
+    const { data: client } = await sb.from('clients').select('*').eq('email', currentUser.email).single();
+    clientData = client;
+
+    // Get portfolio
+    const { data: portfolio } = await sb.from('portfolios').select('*').eq('client_id', client.id);
+    portfolioData = portfolio || [];
+
+    // Get SIPs
+    const { data: sips } = await sb.from('sip_records').select('*').eq('client_id', client.id);
+    sipData = sips || [];
+
+    // Load NAVs from AMFI
+    await loadNAVs();
+
+    // Render everything
+    renderHome();
+    renderPortfolio();
+    renderSIPs();
+    renderInvestFunds();
+
+    hide('loginShell'); hide('otpShell');
+    document.getElementById('appShell').style.display = 'flex';
+    document.getElementById('advisorNameDisplay').textContent = ADVISOR_NAME;
+  } catch(e) {
+    showToast('Error loading data. Contact advisor.', 'error');
+    showLogin();
+  }
+  hide('loadingOverlay');
+}
+
+// ══════════════════════════════
+// NAV FROM AMFI (mfapi.in)
+// ══════════════════════════════
+async function loadNAVs() {
+  const schemeCodes = [...new Set(portfolioData.map(p => p.scheme_code))];
+  const tickerHtml = [];
+  for (const code of schemeCodes) {
+    try {
+      const r = await fetch(`https://api.mfapi.in/mf/${code}/latest`);
+      const d = await r.json();
+      if (d.data && d.data[0]) {
+        const nav = parseFloat(d.data[0].nav);
+        const name = d.meta.scheme_name.split(' ').slice(0,3).join(' ');
+        portfolioData.forEach(p => { if (p.scheme_code == code) p.current_nav = nav; });
+        tickerHtml.push(`<div class="t-item"><span class="t-name">${name.substring(0,8).toUpperCase()}</span><span class="t-val">₹${nav.toFixed(2)}</span></div>`);
+      }
+    } catch(e) {}
+  }
+  if (tickerHtml.length) document.getElementById('navTicker').innerHTML = tickerHtml.join('');
+}
+
+// ══════════════════════════════
+// RENDER HOME
+// ══════════════════════════════
+function renderHome() {
+  const now = new Date();
+  document.getElementById('todayDate').textContent = now.toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  document.getElementById('clientName').textContent = clientData?.name || 'Valued Client';
+
+  const totals = calcTotals();
+  document.getElementById('totalValue').textContent = fmt(totals.currentVal);
+  document.getElementById('investedAmt').textContent = fmt(totals.invested);
+  document.getElementById('gainAmt').textContent = (totals.gain >= 0 ? '+' : '') + fmt(totals.gain);
+  document.getElementById('gainAmt').style.color = totals.gain >= 0 ? 'var(--green)' : 'var(--red)';
+  const ret = totals.invested > 0 ? ((totals.gain / totals.invested) * 100).toFixed(1) : '0.0';
+  document.getElementById('absReturn').textContent = (ret >= 0 ? '+' : '') + ret + '%';
+  document.getElementById('xirrVal').textContent = clientData?.xirr ? clientData.xirr + '%' : 'N/A';
+  const activeSips = sipData.filter(s => s.status === 'active').length;
+  document.getElementById('activeSips').textContent = activeSips;
+
+  // SIP Alert
+  const nextSip = sipData.filter(s => s.status === 'active').sort((a,b) => a.next_date - b.next_date)[0];
+  if (nextSip) {
+    document.getElementById('sipAlertText').textContent = `${nextSip.fund_name} · ₹${Number(nextSip.amount).toLocaleString('en-IN')} · ${nextSip.next_date}`;
+  } else {
+    document.getElementById('sipAlertBox').style.display = 'none';
+  }
+
+  // Funds list
+  const fl = document.getElementById('fundsList');
+  if (!portfolioData.length) { fl.innerHTML = '<div style="color:var(--text2);font-size:13px;padding:20px 0;text-align:center">No funds found. Contact your advisor.</div>'; return; }
+  fl.innerHTML = portfolioData.slice(0,3).map(p => {
+    const curr = (p.current_nav || p.avg_nav) * p.units;
+    const inv = p.avg_nav * p.units;
+    const ret = ((curr - inv) / inv * 100).toFixed(1);
+    const letter = (p.amc_name || p.fund_name || 'F')[0].toUpperCase();
+    return `<div class="fund-item">
+      <div class="fi-left">
+        <div class="fi-logo">${letter}</div>
+        <div><div class="fi-name">${p.fund_name}</div><div class="fi-sub">${p.units.toFixed(2)} units</div></div>
+      </div>
+      <div class="fi-right"><div class="fi-val">${fmt(curr)}</div><div class="fi-ret ${ret>=0?'up':'dn'}">${ret>=0?'+':''}${ret}%</div></div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════
+// RENDER PORTFOLIO
+// ══════════════════════════════
+function renderPortfolio() {
+  const totals = calcTotals();
+  document.getElementById('p-totalVal').textContent = fmt(totals.currentVal);
+  document.getElementById('p-invested').textContent = fmt(totals.invested);
+  document.getElementById('p-gain').textContent = (totals.gain >= 0 ? '+' : '') + fmt(totals.gain);
+  document.getElementById('p-gain').style.color = totals.gain >= 0 ? 'var(--green)' : 'var(--red)';
+  const ret = totals.invested > 0 ? ((totals.gain / totals.invested) * 100).toFixed(1) : '0.0';
+  document.getElementById('p-abs').textContent = (ret >= 0 ? '+' : '') + ret + '%';
+  document.getElementById('p-xirr').textContent = clientData?.xirr ? clientData.xirr + '%' : 'N/A';
+  document.getElementById('p-funds').textContent = portfolioData.length;
+
+  const hl = document.getElementById('holdingsList');
+  if (!portfolioData.length) { hl.innerHTML = '<div style="color:var(--text2);font-size:13px;padding:20px 0;text-align:center">No holdings found.</div>'; return; }
+  hl.innerHTML = portfolioData.map(p => {
+    const curr = (p.current_nav || p.avg_nav) * p.units;
+    const inv = p.avg_nav * p.units;
+    const ret = ((curr - inv) / inv * 100).toFixed(1);
+    const barW = Math.min(Math.max(parseFloat(ret) + 20, 5), 100);
+    return `<div class="holding-card">
+      <div class="hc-top">
+        <div><div class="hc-amc">${p.amc_name || ''}</div><div class="hc-name">${p.fund_name}</div></div>
+        <div><div class="hc-value">${fmt(curr)}</div><div class="hc-ret ${ret>=0?'up':'dn'}">${ret>=0?'+':''}${ret}%</div></div>
+      </div>
+      <div class="hc-bar"><div class="hc-bar-fill" style="width:${barW}%"></div></div>
+      <div class="hc-meta"><span>${p.units.toFixed(3)} units @ ₹${p.avg_nav}</span><span class="mono">NAV ₹${p.current_nav || p.avg_nav}</span></div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════
+// RENDER SIPs
+// ══════════════════════════════
+function renderSIPs() {
+  const active = sipData.filter(s => s.status === 'active');
+  const monthly = active.reduce((sum, s) => sum + Number(s.amount), 0);
+  document.getElementById('s-monthly').textContent = fmt(monthly);
+  document.getElementById('s-active').textContent = active.length + ' Active';
+
+  const sl = document.getElementById('sipList');
+  if (!sipData.length) { sl.innerHTML = '<div style="color:var(--text2);font-size:13px;padding:20px 0;text-align:center">No SIPs found. Contact advisor to start one.</div>'; return; }
+  sl.innerHTML = sipData.map(s => {
+    const prog = s.installments_done && s.total_installments ? Math.round((s.installments_done / s.total_installments) * 100) : 0;
+    const isActive = s.status === 'active';
+    return `<div class="sip-item" style="${!isActive ? 'opacity:.55' : ''}">
+      <div class="si-top">
+        <div><div class="si-name">${s.fund_name}</div><div class="si-type">Monthly ${s.type || 'SIP'}</div></div>
+        <div class="si-right"><div class="si-amt">₹${Number(s.amount).toLocaleString('en-IN')}</div><div class="si-date">${isActive ? 'Next: ' + (s.next_date || '—') : 'Paused'}</div></div>
+      </div>
+      <div class="si-bottom">
+        <div class="si-progress">
+          ${s.installments_done ? `<div style="font-size:10px;color:var(--text2);margin-bottom:4px">${s.installments_done} / ${s.total_installments || '?'} installments</div>` : ''}
+          <div class="si-prog-bar"><div class="si-prog-fill" style="width:${prog}%;${!isActive?'background:var(--text3)':''}"></div></div>
+        </div>
+        <span class="badge ${isActive ? 'b-g' : 'b-r'}">${isActive ? 'Active' : 'Paused'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════
+// RENDER INVEST FUNDS
+// ══════════════════════════════
+function renderInvestFunds() {
+  const ifl = document.getElementById('investFundList');
+  if (!portfolioData.length) {
+    ifl.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:13px">Contact advisor to explore funds.</div>';
+    return;
+  }
+  ifl.innerHTML = portfolioData.map((p, i) => `
+    <div class="fs-item ${i===0?'selected':''}" onclick="selectFund(this,'${p.fund_name}')">
+      <div><div style="font-size:13px;font-weight:600">${p.fund_name}</div><div style="font-size:11px;color:var(--text2)">NAV ₹${p.current_nav || p.avg_nav}</div></div>
+      <div class="fs-radio" style="${i===0?'border-color:var(--gold);background:var(--gold)':''}"></div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════
+// HELPERS
+// ══════════════════════════════
+function calcTotals() {
+  let currentVal = 0, invested = 0;
+  portfolioData.forEach(p => {
+    currentVal += (p.current_nav || p.avg_nav) * p.units;
+    invested += p.avg_nav * p.units;
+  });
+  return { currentVal, invested, gain: currentVal - invested };
+}
+
+function fmt(n) {
+  if (n >= 10000000) return '₹' + (n/10000000).toFixed(2) + ' Cr';
+  if (n >= 100000) return '₹' + (n/100000).toFixed(2) + ' L';
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+
+function setAmt(v) {
+  document.getElementById('investAmount').value = v;
+  document.querySelectorAll('.preset').forEach(p => p.classList.remove('sel'));
+  event.target.classList.add('sel');
+}
+
+function selectFund(el, name) {
+  document.querySelectorAll('.fs-item').forEach(i => { i.classList.remove('selected'); i.querySelector('.fs-radio').style.cssText=''; });
+  el.classList.add('selected');
+  el.querySelector('.fs-radio').style.cssText = 'border-color:var(--gold);background:var(--gold)';
+}
+
+function sendInvestRequest() {
+  const fund = document.querySelector('.fs-item.selected div div')?.textContent || 'Selected fund';
+  const amt = document.getElementById('investAmount').value || '0';
+  const date = document.getElementById('sipDate').value || 'any date';
+  const msg = encodeURIComponent(`Hello ${ADVISOR_NAME}, I would like to invest ₹${Number(amt).toLocaleString('en-IN')} in ${fund} via SIP on ${date}. Please process this. Thank you.`);
+  window.open(`https://wa.me/${ADVISOR_WHATSAPP}?text=${msg}`, '_blank');
+}
+
+function contactWhatsApp() {
+  const msg = encodeURIComponent(`Hello ${ADVISOR_NAME}, I wanted to connect regarding my portfolio. Please let me know a good time to talk.`);
+  window.open(`https://wa.me/${ADVISOR_WHATSAPP}?text=${msg}`, '_blank');
+}
+
+function contactCall() { window.open(`tel:${ADVISOR_PHONE}`); }
+
+function sendChat() {
+  const inp = document.getElementById('chatInput');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  const whatsappMsg = encodeURIComponent(msg);
+  window.open(`https://wa.me/${ADVISOR_WHATSAPP}?text=${whatsappMsg}`, '_blank');
+  inp.value = '';
+}
+
+function otpNext(el, nextId) { if (el.value) document.getElementById(nextId)?.focus(); }
+function otpSubmit(el) { if (el.value) verifyOTP(); }
+
+// ══════════════════════════════
+// NAVIGATION
+// ══════════════════════════════
+const screens = ['home','portfolio','sip','invest','concierge'];
+function goTo(name) {
+  screens.forEach(s => {
+    const el = document.getElementById('scr-'+s);
+    if (el) el.classList.toggle('active', s === name);
+    const bn = document.getElementById('bn-'+s);
+    if (bn) bn.classList.toggle('active', s === name);
+  });
+  window.scrollTo(0,0);
+}
+
+function selTab(el) {
+  el.parentElement.querySelectorAll('.itab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ══════════════════════════════
+// UI HELPERS
+// ══════════════════════════════
+function show(id) { document.getElementById(id).style.display = 'flex'; }
+function hide(id) { const el = document.getElementById(id); if(el) el.style.display = 'none'; }
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}`;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// START
+window.addEventListener('load', initApp);
+</script>
+
+</body>
+</html>
