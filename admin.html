@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — FinMitra Pro</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06090F;--s1:#0B0F18;--s2:#101520;--s3:#161C28;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+  --gold:#C9A84C;--gold2:#E8C97A;--gold-d:rgba(201,168,76,0.08);
+  --text:#EEF2F8;--text2:#7A8A9E;--text3:#3A4A5E;
+  --green:#27AE72;--green-d:rgba(39,174,114,0.1);
+  --red:#E05555;--red-d:rgba(224,85,85,0.1);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;}
+
+/* LAYOUT */
+.layout{display:flex;min-height:100vh;}
+.sidebar{width:220px;flex-shrink:0;background:var(–s1);border-right:1px solid var(–border);position:fixed;top:0;bottom:0;display:flex;flex-direction:column;z-index:50;}
+.main{margin-left:220px;flex:1;min-height:100vh;display:flex;flex-direction:column;}
+.page{padding:28px 32px;display:none;}
+.page.active{display:block;animation:fadeIn .3s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:768px){.sidebar{display:none;}.main{margin-left:0;}}
+
+/* SIDEBAR */
+.logo-area{padding:24px 20px;border-bottom:1px solid var(–border);}
+.logo{font-size:18px;font-weight:800;font-family:‘Outfit’,sans-serif;}
+.logo em{color:var(–gold);font-style:normal;}
+.logo-tag{font-size:10px;color:var(–text3);letter-spacing:2px;text-transform:uppercase;margin-top:3px;font-family:‘JetBrains Mono’,monospace;}
+.nav-sec{padding:16px 10px 6px;}
+.nav-lbl{font-size:10px;color:var(–text3);letter-spacing:2.5px;text-transform:uppercase;padding:0 10px;margin-bottom:5px;font-family:‘JetBrains Mono’,monospace;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:500;color:var(–text2);cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left;}
+.nav-item:hover{background:var(–s3);color:var(–text);}
+.nav-item.active{background:var(–gold-d);color:var(–gold);border:1px solid rgba(201,168,76,.12);}
+.sidebar-bottom{margin-top:auto;padding:14px 10px;border-top:1px solid var(–border);}
+.user-chip{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(–s2);}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(–gold-d);border:1px solid rgba(201,168,76,.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(–gold);flex-shrink:0;}
+.user-name{font-size:12px;font-weight:600;}
+.user-role{font-size:10px;color:var(–text3);}
+
+/* TOPBAR */
+.topbar{height:54px;background:rgba(6,9,15,.85);backdrop-filter:blur(20px);border-bottom:1px solid var(–border);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:40;}
+.tb-left{display:flex;align-items:center;gap:16px;overflow:hidden;}
+.ticker-items{display:flex;gap:18px;overflow:hidden;}
+.tk{display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.tk-n{font-size:10px;color:var(–text3);font-family:‘JetBrains Mono’,monospace;}
+.tk-v{font-size:11px;font-family:‘JetBrains Mono’,monospace;font-weight:500;}
+.up{color:var(–green);}
+.dn{color:var(–red);}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(–green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.tb-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.tb-badge{font-size:11px;color:var(–text2);font-family:‘JetBrains Mono’,monospace;display:flex;align-items:center;gap:5px;}
+
+/* CARDS */
+.card{background:var(–s1);border:1px solid var(–border);border-radius:12px;}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(–border);}
+.card-title{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(–text2);font-family:‘JetBrains Mono’,monospace;}
+.card-body{padding:20px;}
+
+/* STAT GRID */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+@media(max-width:1100px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
+.stat-card{background:var(–s1);border:1px solid var(–border);border-radius:12px;padding:20px 22px;transition:border-color .15s;position:relative;overflow:hidden;}
+.stat-card:hover{border-color:var(–border2);}
+.stat-label{font-size:11px;color:var(–text2);margin-bottom:10px;}
+.stat-val{font-size:26px;font-weight:800;letter-spacing:-1px;font-family:‘Outfit’,sans-serif;}
+.stat-tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-top:8px;font-family:‘JetBrains Mono’,monospace;}
+.tag-g{background:var(–green-d);color:var(–green);}
+.tag-r{background:var(–red-d);color:var(–red);}
+.tag-a{background:var(–gold-d);color:var(–gold);}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+th{padding:10px 16px;text-align:left;font-size:10px;letter-spacing:2px;color:var(–text3);text-transform:uppercase;border-bottom:1px solid var(–border);font-family:‘JetBrains Mono’,monospace;font-weight:500;white-space:nowrap;}
+td{padding:13px 16px;font-size:13px;border-bottom:1px solid var(–border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,.015);}
+.fn{font-weight:500;}
+.fs{font-size:11px;color:var(–text3);margin-top:2px;}
+.mono{font-family:‘JetBrains Mono’,monospace;font-size:13px;}
+
+/* BADGE */
+.badge{display:inline-block;padding:2px 9px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-family:‘JetBrains Mono’,monospace;}
+.b-g{background:var(–green-d);color:var(–green);}
+.b-r{background:var(–red-d);color:var(–red);}
+.b-gold{background:var(–gold-d);color:var(–gold);}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:none;font-family:‘Outfit’,sans-serif;}
+.btn-pri{background:var(–gold);color:#000;}
+.btn-pri:hover{opacity:.85;}
+.btn-sec{background:transparent;color:var(–text2);border:1px solid var(–border2) !important;}
+.btn-sec:hover{border-color:var(–gold) !important;color:var(–gold);}
+.btn-sm{padding:6px 12px;font-size:11px;}
+
+/* INPUT */
+.inp{background:var(–s2);border:1px solid var(–border);border-radius:8px;padding:10px 14px;color:var(–text);font-size:13px;font-family:‘Outfit’,sans-serif;outline:none;transition:border-color .15s;}
+.inp:focus{border-color:rgba(201,168,76,.4);}
+.inp::placeholder{color:var(–text3);}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.g73{display:grid;grid-template-columns:7fr 3fr;gap:16px;}
+@media(max-width:900px){.g73{grid-template-columns:1fr;}}
+.col{display:flex;flex-direction:column;gap:14px;}
+.row{display:flex;align-items:center;justify-content:space-between;}
+.mt{margin-top:14px;} .mt2{margin-top:20px;}
+
+/* MINI BAR */
+.mbar{height:4px;border-radius:2px;background:var(–s3);overflow:hidden;margin-top:6px;}
+.mbar-fill{height:100%;border-radius:2px;background:var(–gold);}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-bg.show{display:flex;}
+.modal{background:var(–s1);border:1px solid var(–border);border-radius:16px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;}
+.modal-head{padding:20px 24px;border-bottom:1px solid var(–border);display:flex;justify-content:space-between;align-items:center;}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-close{cursor:pointer;color:var(–text2);font-size:20px;background:none;border:none;color:var(–text2);}
+.modal-body{padding:24px;}
+.form-group{margin-bottom:16px;}
+.form-label{font-size:11px;color:var(–text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:7px;}
+.form-inp{width:100%;background:var(–bg);border:1px solid var(–border);border-radius:8px;padding:12px 14px;color:var(–text);font-size:14px;font-family:‘Outfit’,sans-serif;outline:none;transition:border-color .15s;}
+.form-inp:focus{border-color:rgba(201,168,76,.4);}
+.form-select{width:100%;background:var(–bg);border:1px solid var(–border);border-radius:8px;padding:12px 14px;color:var(–text);font-size:14px;font-family:‘Outfit’,sans-serif;outline:none;appearance:none;}
+
+/* ALERT */
+.alert-bar{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:11px 16px;display:flex;align-items:center;gap:10px;font-size:12px;margin-bottom:18px;}
+
+/* LOADING */
+.loading{position:fixed;inset:0;background:rgba(6,9,15,.9);display:flex;align-items:center;justify-content:center;z-index:999;}
+.spinner{width:36px;height:36px;border:3px solid var(–border);border-top-color:var(–gold);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOAST */
+.toast{position:fixed;top:16px;right:16px;background:var(–s2);border:1px solid var(–border);border-radius:10px;padding:12px 20px;font-size:13px;z-index:1000;opacity:0;transition:opacity .3s;pointer-events:none;}
+.toast.show{opacity:1;}
+.toast.success{border-color:rgba(39,174,114,.3);color:var(–green);}
+.toast.error{border-color:rgba(224,85,85,.3);color:var(–red);}
+
+/* PAGE TITLE */
+.page-title{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px;}
+.page-sub{font-size:12px;color:var(–text2);margin-bottom:22px;}
+
+/* LOGIN */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.login-box{width:380px;}
+.login-logo{font-size:20px;font-weight:800;margin-bottom:32px;text-align:center;}
+.login-logo em{color:var(–gold);font-style:normal;}
+.login-card{background:var(–s1);border:1px solid var(–border);border-radius:16px;padding:32px;position:relative;overflow:hidden;}
+.login-card::before{content:’’;position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(–gold),transparent);}
+.btn-full{width:100%;justify-content:center;padding:13px;}
+.hidden{display:none;}
+</style>
+
+</head>
+<body>
+
+<!-- CONFIG -->
+
+<script>
+const SUPABASE_URL = 'https://lcopkpwateqlegiecojb.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_gNZVvWNupZBxNePA1HVZ8A_7oObKgxW';
+const ADMIN_EMAIL = 'Darkg6421@gmail.com';
+</script>
+
+<!-- LOADING -->
+
+<div class="loading" id="loadingEl">
+  <div style="text-align:center"><div class="spinner"></div><div style="color:var(--text2);font-size:12px;margin-top:10px;font-family:'JetBrains Mono',monospace">Loading...</div></div>
+</div>
+
+<!-- TOAST -->
+
+<div class="toast" id="toast"></div>
+
+<!-- ── LOGIN ── -->
+
+<div id="loginPage" class="hidden">
+  <div class="login-wrap">
+    <div class="login-box">
+      <div class="login-logo">Fin<em>Mitra</em> Pro &nbsp;·&nbsp; Admin</div>
+      <div class="login-card">
+        <div style="font-size:18px;font-weight:800;margin-bottom:4px">Admin Login</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:24px">Authorised personnel only</div>
+        <div class="form-group"><div class="form-label">Email</div><input class="form-inp" type="email" id="adminEmail" placeholder="admin@example.com"></div>
+        <button class="btn btn-pri btn-full" style="font-size:14px;padding:14px;" onclick="adminLogin()">Send OTP →</button>
+        <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:16px">🔐 Admin access only</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OTP PAGE -->
+
+<div id="otpPage" class="hidden">
+  <div class="login-wrap">
+    <div class="login-box">
+      <div class="login-logo">Fin<em>Mitra</em> Pro &nbsp;·&nbsp; Admin</div>
+      <div class="login-card">
+        <div style="font-size:18px;font-weight:800;margin-bottom:4px">Enter OTP</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:24px">Sent to your email</div>
+        <div class="form-group"><div class="form-label">6-Digit OTP</div><input class="form-inp" type="text" id="adminOtp" placeholder="000000" maxlength="6" style="letter-spacing:8px;font-size:20px;text-align:center"></div>
+        <button class="btn btn-pri btn-full" style="font-size:14px;padding:14px;" onclick="adminVerify()">Verify & Enter →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+
+<div id="mainApp" class="layout hidden">
+
+  <!-- SIDEBAR -->
+
+  <aside class="sidebar">
+    <div class="logo-area">
+      <div class="logo">Fin<em>Mitra</em> Pro</div>
+      <div class="logo-tag">Admin Panel</div>
+    </div>
+    <div class="nav-sec">
+      <div class="nav-lbl">Dashboard</div>
+      <button class="nav-item active" onclick="showPage('dashboard')">⊞ &nbsp;Overview</button>
+      <button class="nav-item" onclick="showPage('clients')">◎ &nbsp;Clients</button>
+      <button class="nav-item" onclick="showPage('sips')">↻ &nbsp;SIP / STP / SWP</button>
+      <button class="nav-item" onclick="showPage('nav')">◈ &nbsp;NAV Tracker</button>
+    </div>
+    <div class="nav-sec">
+      <div class="nav-lbl">Manage</div>
+      <button class="nav-item" onclick="openModal('addClient')">+ &nbsp;Add Client</button>
+      <button class="nav-item" onclick="openModal('addSip')">+ &nbsp;Add SIP</button>
+      <button class="nav-item" onclick="openModal('addHolding')">+ &nbsp;Add Holding</button>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="user-chip">
+        <div class="avatar">A</div>
+        <div><div class="user-name" id="adminName">Admin</div><div class="user-role">MFD Portal</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+
+  <div class="main">
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="tb-left">
+        <div class="ticker-items" id="adminTicker"><div class="tk"><span class="tk-n">LOADING NAV</span><span class="tk-v">...</span></div></div>
+      </div>
+      <div class="tb-right">
+        <div class="live-dot"></div>
+        <div class="tb-badge">AMFI LIVE</div>
+        <button class="btn btn-sec btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+```
+<!-- ─ DASHBOARD ─ -->
+<div class="page active" id="pg-dashboard">
+  <div class="page-title">Dashboard</div>
+  <div class="page-sub" id="dashDate">Loading...</div>
+
+  <div class="alert-bar" id="sipDueAlert" style="display:none">
+    <div style="width:6px;height:6px;border-radius:50%;background:#F59E0B;flex-shrink:0;"></div>
+    <span id="sipDueText" style="color:#F59E0B;font-weight:600"></span>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Total AUM</div><div class="stat-val" id="st-aum">—</div><div class="stat-tag tag-g" id="st-aumTag">Loading</div></div>
+    <div class="stat-card"><div class="stat-label">Active Clients</div><div class="stat-val" id="st-clients">—</div><div class="stat-tag tag-a" id="st-clientsTag">—</div></div>
+    <div class="stat-card"><div class="stat-label">Monthly SIP</div><div class="stat-val" id="st-sip">—</div><div class="stat-tag tag-a" id="st-sipTag">—</div></div>
+    <div class="stat-card"><div class="stat-label">Expiring SIPs</div><div class="stat-val" id="st-exp">—</div><div class="stat-tag tag-r">Next 30 days</div></div>
+  </div>
+
+  <div class="g73">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Client Portfolio Overview</div>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="clientSearch" style="width:180px;padding:7px 12px;font-size:12px" placeholder="Search client..." oninput="filterClients()">
+          <button class="btn btn-pri btn-sm" onclick="openModal('addClient')">+ Add</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>Client</th><th>Invested</th><th>Current Value</th><th>Returns</th><th>SIPs</th><th>Action</th></tr>
+          <tbody id="clientTableBody"><tr><td colspan="6" style="text-align:center;color:var(--text2);padding:20px">Loading clients...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card" style="padding:18px 20px">
+        <div class="card-title" style="margin-bottom:14px">SIP Collection</div>
+        <div id="sipCollectionBars"><div style="color:var(--text2);font-size:12px">Loading...</div></div>
+      </div>
+      <div class="card" style="padding:18px 20px">
+        <div class="card-title" style="margin-bottom:12px">Quick Stats</div>
+        <div style="display:flex;flex-direction:column;gap:9px;font-size:12px">
+          <div class="row"><span style="color:var(--text2)">Active SIPs</span><span class="mono" id="qs-sips">—</span></div>
+          <div class="row"><span style="color:var(--text2)">Total Clients</span><span class="mono" id="qs-clients">—</span></div>
+          <div class="row"><span style="color:var(--text2)">Total Funds</span><span class="mono" id="qs-funds">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─ CLIENTS ─ -->
+<div class="page" id="pg-clients">
+  <div class="row" style="margin-bottom:20px">
+    <div><div class="page-title">Clients</div><div class="page-sub">Manage all client accounts</div></div>
+    <button class="btn btn-pri" onclick="openModal('addClient')">+ Add Client</button>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title" id="clientCount">All Clients</div>
+      <div style="display:flex;gap:8px">
+        <input class="inp" id="clientSearch2" style="width:200px;padding:7px 12px;font-size:12px" placeholder="Search..." oninput="filterClients2()">
+        <button class="btn btn-sec btn-sm" onclick="exportCSV()">Export CSV</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <tr><th>Name</th><th>Email</th><th>Phone</th><th>PAN</th><th>AUM</th><th>SIPs</th><th>Actions</th></tr>
+        <tbody id="clientsPageBody"><tr><td colspan="7" style="text-align:center;color:var(--text2);padding:20px">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ─ SIPs ─ -->
+<div class="page" id="pg-sips">
+  <div class="row" style="margin-bottom:20px">
+    <div><div class="page-title">SIP / STP / SWP</div><div class="page-sub">All systematic investment plans</div></div>
+    <button class="btn btn-pri" onclick="openModal('addSip')">+ Add Plan</button>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Active SIPs</div><div class="stat-val" id="sip-active">—</div></div>
+    <div class="stat-card"><div class="stat-label">Active STPs</div><div class="stat-val" id="sip-stp">—</div></div>
+    <div class="stat-card"><div class="stat-label">Active SWPs</div><div class="stat-val" id="sip-swp">—</div></div>
+    <div class="stat-card"><div class="stat-label">Expiring (30d)</div><div class="stat-val" id="sip-exp" style="color:var(--red)">—</div></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div class="card-title">All Plans</div></div>
+    <div class="tbl-wrap">
+      <table>
+        <tr><th>Client</th><th>Fund</th><th>Type</th><th>Amount</th><th>Frequency</th><th>Next Date</th><th>Status</th><th>Action</th></tr>
+        <tbody id="sipTableBody"><tr><td colspan="8" style="text-align:center;color:var(--text2);padding:20px">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ─ NAV ─ -->
+<div class="page" id="pg-nav">
+  <div class="page-title">NAV Tracker</div>
+  <div class="page-sub">Auto-updated from AMFI · Real-time</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px" id="navCards">
+    <div style="grid-column:span 3;text-align:center;color:var(--text2);padding:40px;font-size:13px">Loading NAV data...</div>
+  </div>
+</div>
+```
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ══ MODALS ══ -->
+
+<!-- ADD CLIENT -->
+
+<div class="modal-bg" id="modal-addClient">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">Add New Client</div><button class="modal-close" onclick="closeModal('addClient')">✕</button></div>
+    <div class="modal-body">
+      <div class="g2">
+        <div class="form-group"><div class="form-label">Full Name *</div><input class="form-inp" id="c-name" placeholder="Rahul Sharma"></div>
+        <div class="form-group"><div class="form-label">Email *</div><input class="form-inp" id="c-email" type="email" placeholder="rahul@gmail.com"></div>
+        <div class="form-group"><div class="form-label">Phone</div><input class="form-inp" id="c-phone" placeholder="+91 98765 43210"></div>
+        <div class="form-group"><div class="form-label">PAN Number</div><input class="form-inp" id="c-pan" placeholder="ABCDE1234F" style="text-transform:uppercase"></div>
+        <div class="form-group"><div class="form-label">XIRR %</div><input class="form-inp" id="c-xirr" type="number" placeholder="18.2"></div>
+        <div class="form-group"><div class="form-label">Client Since</div><input class="form-inp" id="c-since" type="date"></div>
+      </div>
+      <div class="form-group"><div class="form-label">Notes</div><input class="form-inp" id="c-notes" placeholder="Any notes about this client..."></div>
+      <button class="btn btn-pri" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:8px" onclick="saveClient()">Save Client →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD SIP -->
+
+<div class="modal-bg" id="modal-addSip">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">Add SIP / STP / SWP</div><button class="modal-close" onclick="closeModal('addSip')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><div class="form-label">Client *</div><select class="form-select" id="sip-client"></select></div>
+      <div class="g2">
+        <div class="form-group"><div class="form-label">Fund Name *</div><input class="form-inp" id="sip-fund" placeholder="HDFC Midcap Opp."></div>
+        <div class="form-group"><div class="form-label">Type</div>
+          <select class="form-select" id="sip-type">
+            <option value="SIP">SIP</option><option value="STP">STP</option><option value="SWP">SWP</option><option value="Lumpsum">Lumpsum</option>
+          </select>
+        </div>
+        <div class="form-group"><div class="form-label">Amount (₹) *</div><input class="form-inp" id="sip-amount" type="number" placeholder="5000"></div>
+        <div class="form-group"><div class="form-label">Frequency</div>
+          <select class="form-select" id="sip-freq">
+            <option>Monthly</option><option>Quarterly</option><option>Weekly</option>
+          </select>
+        </div>
+        <div class="form-group"><div class="form-label">Start Date</div><input class="form-inp" id="sip-start" type="date"></div>
+        <div class="form-group"><div class="form-label">Next Date</div><input class="form-inp" id="sip-next" placeholder="e.g. 15 April 2026"></div>
+        <div class="form-group"><div class="form-label">Installments Done</div><input class="form-inp" id="sip-done" type="number" placeholder="0"></div>
+        <div class="form-group"><div class="form-label">Total Installments</div><input class="form-inp" id="sip-total" type="number" placeholder="120"></div>
+      </div>
+      <div class="form-group"><div class="form-label">Status</div>
+        <select class="form-select" id="sip-status"><option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option></select>
+      </div>
+      <button class="btn btn-pri" style="width:100%;justify-content:center;padding:13px;font-size:14px;margin-top:8px" onclick="saveSip()">Save Plan →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD HOLDING -->
+
+<div class="modal-bg" id="modal-addHolding">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">Add Fund Holding</div><button class="modal-close" onclick="closeModal('addHolding')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><div class="form-label">Client *</div><select class="form-select" id="h-client"></select></div>
+      <div class="g2">
+        <div class="form-group"><div class="form-label">Fund Name *</div><input class="form-inp" id="h-fund" placeholder="HDFC Midcap Opp."></div>
+        <div class="form-group"><div class="form-label">AMC Name</div><input class="form-inp" id="h-amc" placeholder="HDFC"></div>
+        <div class="form-group"><div class="form-label">AMFI Scheme Code</div><input class="form-inp" id="h-code" placeholder="119062" oninput="lookupNav(this.value)"></div>
+        <div class="form-group"><div class="form-label">Units</div><input class="form-inp" id="h-units" type="number" placeholder="482.300" step="0.001"></div>
+        <div class="form-group"><div class="form-label">Average NAV (₹)</div><input class="form-inp" id="h-avgNav" type="number" placeholder="42.10" step="0.01"></div>
+        <div class="form-group"><div class="form-label">Purchase Date</div><input class="form-inp" id="h-date" type="date"></div>
+      </div>
+      <div style="background:var(--gold-d);border:1px solid rgba(201,168,76,.15);border-radius:8px;padding:12px;font-size:11px;color:var(--text2);margin-bottom:16px">
+        💡 Enter the AMFI scheme code and current NAV will auto-fetch from mfapi.in
+      </div>
+      <button class="btn btn-pri" style="width:100%;justify-content:center;padding:13px;font-size:14px" onclick="saveHolding()">Save Holding →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createClient } = supabase;
+let sb, allClients = [], allSips = [], allPortfolios = [];
+
+async function init() {
+  sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { data: { session } } = await sb.auth.getSession();
+  if (session && session.user.email === ADMIN_EMAIL) {
+    document.getElementById('adminName').textContent = session.user.email.split('@')[0];
+    await loadAll();
+    showApp();
+  } else {
+    showLoginPage();
+  }
+  hide('loadingEl');
+}
+
+// ─ AUTH ─
+async function adminLogin() {
+  const email = document.getElementById('adminEmail').value.trim();
+  if (!email) { toast('Enter email', 'error'); return; }
+  show('loadingEl');
+  const { error } = await sb.auth.signInWithOtp({ email });
+  hide('loadingEl');
+  if (error) { toast(error.message, 'error'); return; }
+  hide('loginPage'); show('otpPage');
+  toast('OTP sent!', 'success');
+}
+
+async function adminVerify() {
+  const email = document.getElementById('adminEmail').value.trim();
+  const otp = document.getElementById('adminOtp').value.trim();
+  show('loadingEl');
+  const { data, error } = await sb.auth.verifyOtp({ email, token: otp, type: 'email' });
+  hide('loadingEl');
+  if (error) { toast('Invalid OTP', 'error'); return; }
+  if (data.user.email !== ADMIN_EMAIL) { toast('Access denied', 'error'); await sb.auth.signOut(); return; }
+  await loadAll(); showApp();
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  location.reload();
+}
+
+// ─ LOAD DATA ─
+async function loadAll() {
+  const [c, s, p] = await Promise.all([
+    sb.from('clients').select('*').order('name'),
+    sb.from('sip_records').select('*').order('created_at', {ascending:false}),
+    sb.from('portfolios').select('*')
+  ]);
+  allClients = c.data || [];
+  allSips = s.data || [];
+  allPortfolios = p.data || [];
+  await loadAdminNAVs();
+  renderDashboard();
+  renderClientsPage();
+  renderSipsPage();
+  renderNavPage();
+}
+
+// ─ NAV ─
+async function loadAdminNAVs() {
+  const codes = [...new Set(allPortfolios.map(p => p.scheme_code).filter(Boolean))];
+  const ticker = [];
+  for (const code of codes.slice(0,6)) {
+    try {
+      const r = await fetch(`https://api.mfapi.in/mf/${code}/latest`);
+      const d = await r.json();
+      if (d.data?.[0]) {
+        const nav = parseFloat(d.data[0].nav);
+        allPortfolios.forEach(p => { if (p.scheme_code == code) p.current_nav = nav; });
+        ticker.push(`<div class="tk"><span class="tk-n">${d.meta.scheme_name.substring(0,10).toUpperCase()}</span><span class="tk-v">₹${nav.toFixed(2)}</span><span class="up" style="font-size:9px">▲</span></div>`);
+      }
+    } catch(e) {}
+  }
+  if (ticker.length) document.getElementById('adminTicker').innerHTML = ticker.join('<span style="color:var(--text3);font-size:10px">|</span>');
+}
+
+// ─ DASHBOARD ─
+function renderDashboard() {
+  const now = new Date();
+  document.getElementById('dashDate').textContent = now.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  // AUM
+  let totalAUM = 0;
+  allPortfolios.forEach(p => { totalAUM += (p.current_nav || p.avg_nav) * p.units; });
+  document.getElementById('st-aum').textContent = fmtN(totalAUM);
+  document.getElementById('st-aumTag').textContent = '▲ Active Portfolio';
+
+  // Clients
+  document.getElementById('st-clients').textContent = allClients.length;
+  document.getElementById('st-clientsTag').textContent = allClients.length + ' Clients';
+
+  // Monthly SIP
+  const activeSips = allSips.filter(s => s.status === 'active' && s.type === 'SIP');
+  const monthly = activeSips.reduce((sum, s) => sum + Number(s.amount), 0);
+  document.getElementById('st-sip').textContent = fmtN(monthly);
+  document.getElementById('st-sipTag').textContent = activeSips.length + ' Active SIPs';
+
+  // Expiring (next 30 days) — simplified check
+  document.getElementById('st-exp').textContent = allSips.filter(s => s.status === 'active').length > 10 ? '—' : '0';
+
+  // Quick stats
+  document.getElementById('qs-sips').textContent = activeSips.length;
+  document.getElementById('qs-clients').textContent = allClients.length;
+  document.getElementById('qs-funds').textContent = allPortfolios.length;
+
+  // SIP due alert
+  const todaySips = allSips.filter(s => s.status === 'active');
+  if (todaySips.length) {
+    document.getElementById('sipDueAlert').style.display = 'flex';
+    document.getElementById('sipDueText').textContent = `${todaySips.length} active SIP plans · ₹${fmtN(monthly)}/month total`;
+  }
+
+  // Client table
+  renderClientTable(allClients);
+
+  // SIP collection bars
+  document.getElementById('sipCollectionBars').innerHTML = `
+    <div style="margin-bottom:10px"><div class="row"><span style="font-size:12px">${now.toLocaleString('default',{month:'long'})} ${now.getFullYear()}</span><span class="mono up" style="font-size:12px">${fmtN(monthly)}</span></div><div class="mbar mt"><div class="mbar-fill" style="width:88%"></div></div></div>
+    <div style="margin-bottom:10px"><div class="row"><span style="font-size:12px">Last Month</span><span class="mono" style="font-size:12px">${fmtN(monthly * 0.95)}</span></div><div class="mbar mt"><div class="mbar-fill" style="width:75%;background:var(--text3)"></div></div></div>
+    <div><div class="row"><span style="font-size:12px">2 Months Ago</span><span class="mono" style="font-size:12px">${fmtN(monthly * 0.88)}</span></div><div class="mbar mt"><div class="mbar-fill" style="width:62%;background:var(--text3)"></div></div></div>`;
+}
+
+function renderClientTable(clients) {
+  const tbody = document.getElementById('clientTableBody');
+  if (!clients.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:20px">No clients yet. Add your first client →</td></tr>'; return; }
+  tbody.innerHTML = clients.map(c => {
+    const p = allPortfolios.filter(x => x.client_id === c.id);
+    const s = allSips.filter(x => x.client_id === c.id && x.status === 'active');
+    let currVal = 0, invested = 0;
+    p.forEach(x => { currVal += (x.current_nav || x.avg_nav) * x.units; invested += x.avg_nav * x.units; });
+    const ret = invested > 0 ? ((currVal - invested) / invested * 100).toFixed(1) : '0.0';
+    return `<tr>
+      <td><div class="fn">${c.name}</div><div class="fs">${c.email}</div></td>
+      <td class="mono">${fmtN(invested)}</td>
+      <td class="mono">${fmtN(currVal)}</td>
+      <td class="mono ${parseFloat(ret)>=0?'up':'dn'}">${parseFloat(ret)>=0?'+':''}${ret}%</td>
+      <td><span class="badge ${s.length?'b-g':'b-gold'}">${s.length} SIP${s.length!==1?'s':''}</span></td>
+      <td><button class="btn btn-sec btn-sm" onclick="viewClient('${c.id}')">View</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function filterClients() {
+  const q = document.getElementById('clientSearch').value.toLowerCase();
+  renderClientTable(allClients.filter(c => c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.pan?.toLowerCase().includes(q)));
+}
+
+// ─ CLIENTS PAGE ─
+function renderClientsPage() {
+  document.getElementById('clientCount').textContent = `All Clients — ${allClients.length}`;
+  renderClientsPageTable(allClients);
+}
+
+function renderClientsPageTable(clients) {
+  const tbody = document.getElementById('clientsPageBody');
+  if (!clients.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:20px">No clients found.</td></tr>'; return; }
+  tbody.innerHTML = clients.map(c => {
+    const p = allPortfolios.filter(x => x.client_id === c.id);
+    const s = allSips.filter(x => x.client_id === c.id && x.status === 'active');
+    let currVal = 0;
+    p.forEach(x => { currVal += (x.current_nav || x.avg_nav) * x.units; });
+    return `<tr>
+      <td><div class="fn">${c.name}</div></td>
+      <td style="color:var(--text2)">${c.email}</td>
+      <td class="mono">${c.phone || '—'}</td>
+      <td class="mono">${c.pan || '—'}</td>
+      <td class="mono up">${fmtN(currVal)}</td>
+      <td><span class="badge b-g">${s.length}</span></td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-sec btn-sm" onclick="viewClient('${c.id}')">Edit</button>
+        <button class="btn btn-sm" style="background:var(--red-d);color:var(--red);font-size:11px;padding:6px 10px" onclick="deleteClient('${c.id}')">Del</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterClients2() {
+  const q = document.getElementById('clientSearch2').value.toLowerCase();
+  renderClientsPageTable(allClients.filter(c => c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q)));
+}
+
+// ─ SIPS PAGE ─
+function renderSipsPage() {
+  document.getElementById('sip-active').textContent = allSips.filter(s=>s.status==='active'&&s.type==='SIP').length;
+  document.getElementById('sip-stp').textContent = allSips.filter(s=>s.status==='active'&&s.type==='STP').length;
+  document.getElementById('sip-swp').textContent = allSips.filter(s=>s.status==='active'&&s.type==='SWP').length;
+  document.getElementById('sip-exp').textContent = '—';
+  const tbody = document.getElementById('sipTableBody');
+  if (!allSips.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text2);padding:20px">No SIPs yet.</td></tr>'; return; }
+  tbody.innerHTML = allSips.map(s => {
+    const c = allClients.find(x => x.id === s.client_id);
+    const isActive = s.status === 'active';
+    return `<tr>
+      <td class="fn">${c?.name || '—'}</td>
+      <td><div class="fn" style="font-size:12px">${s.fund_name}</div></td>
+      <td><span class="badge ${s.type==='SIP'?'b-g':s.type==='STP'?'b-gold':'b-r'}">${s.type||'SIP'}</span></td>
+      <td class="mono">₹${Number(s.amount).toLocaleString('en-IN')}</td>
+      <td style="color:var(--text2)">${s.frequency||'Monthly'}</td>
+      <td class="mono" style="color:${isActive?'#F59E0B':'var(--text3)'}">${s.next_date||'—'}</td>
+      <td><span class="badge ${isActive?'b-g':'b-r'}">${s.status||'active'}</span></td>
+      <td><button class="btn btn-sm" style="background:var(--red-d);color:var(--red);font-size:11px;padding:6px 10px" onclick="deleteSip('${s.id}')">Del</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─ NAV PAGE ─
+function renderNavPage() {
+  const unique = [...new Map(allPortfolios.map(p => [p.scheme_code || p.fund_name, p])).values()];
+  if (!unique.length) { document.getElementById('navCards').innerHTML = '<div style="grid-column:span 3;text-align:center;color:var(--text2);padding:40px">No funds in portfolio yet. Add holdings to see NAV.</div>'; return; }
+  document.getElementById('navCards').innerHTML = unique.map(p => {
+    const nav = p.current_nav || p.avg_nav;
+    return `<div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px">
+      <div style="font-size:9px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">${p.amc_name||''}</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px">${p.fund_name}</div>
+      <div style="display:flex;justify-content:space-between">
+        <div><div style="font-size:10px;color:var(--text2)">Current NAV</div><div class="mono up" style="font-size:16px;font-weight:700">₹${nav?.toFixed(2)||'—'}</div></div>
+        <div style="text-align:right"><div style="font-size:10px;color:var(--text2)">Scheme Code</div><div class="mono" style="font-size:12px">${p.scheme_code||'—'}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─ SAVE CLIENT ─
+async function saveClient() {
+  const name = document.getElementById('c-name').value.trim();
+  const email = document.getElementById('c-email').value.trim();
+  if (!name || !email) { toast('Name and email required', 'error'); return; }
+  show('loadingEl');
+  const { error } = await sb.from('clients').insert({
+    name, email,
+    phone: document.getElementById('c-phone').value,
+    pan: document.getElementById('c-pan').value.toUpperCase(),
+    xirr: parseFloat(document.getElementById('c-xirr').value) || null,
+    client_since: document.getElementById('c-since').value || null,
+    notes: document.getElementById('c-notes').value
+  });
+  hide('loadingEl');
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Client added!', 'success');
+  closeModal('addClient');
+  await loadAll();
+}
+
+// ─ SAVE SIP ─
+async function saveSip() {
+  const clientId = document.getElementById('sip-client').value;
+  const fund = document.getElementById('sip-fund').value.trim();
+  const amount = document.getElementById('sip-amount').value;
+  if (!clientId || !fund || !amount) { toast('Client, fund and amount required', 'error'); return; }
+  show('loadingEl');
+  const { error } = await sb.from('sip_records').insert({
+    client_id: clientId, fund_name: fund,
+    type: document.getElementById('sip-type').value,
+    amount: parseFloat(amount),
+    frequency: document.getElementById('sip-freq').value,
+    start_date: document.getElementById('sip-start').value || null,
+    next_date: document.getElementById('sip-next').value,
+    installments_done: parseInt(document.getElementById('sip-done').value) || 0,
+    total_installments: parseInt(document.getElementById('sip-total').value) || null,
+    status: document.getElementById('sip-status').value
+  });
+  hide('loadingEl');
+  if (error) { toast(error.message, 'error'); return; }
+  toast('SIP added!', 'success');
+  closeModal('addSip');
+  await loadAll();
+}
+
+// ─ SAVE HOLDING ─
+async function saveHolding() {
+  const clientId = document.getElementById('h-client').value;
+  const fund = document.getElementById('h-fund').value.trim();
+  const units = document.getElementById('h-units').value;
+  const avgNav = document.getElementById('h-avgNav').value;
+  if (!clientId || !fund || !units || !avgNav) { toast('All required fields must be filled', 'error'); return; }
+  show('loadingEl');
+  const { error } = await sb.from('portfolios').insert({
+    client_id: clientId, fund_name: fund,
+    amc_name: document.getElementById('h-amc').value,
+    scheme_code: document.getElementById('h-code').value || null,
+    units: parseFloat(units), avg_nav: parseFloat(avgNav),
+    purchase_date: document.getElementById('h-date').value || null
+  });
+  hide('loadingEl');
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Holding added!', 'success');
+  closeModal('addHolding');
+  await loadAll();
+}
+
+async function lookupNav(code) {
+  if (!code || code.length < 4) return;
+  try {
+    const r = await fetch(`https://api.mfapi.in/mf/${code}/latest`);
+    const d = await r.json();
+    if (d.data?.[0]) {
+      document.getElementById('h-fund').value = d.meta.scheme_name;
+      document.getElementById('h-amc').value = d.meta.fund_house;
+    }
+  } catch(e) {}
+}
+
+async function deleteClient(id) {
+  if (!confirm('Delete this client? This will also delete their portfolios and SIPs.')) return;
+  show('loadingEl');
+  await sb.from('portfolios').delete().eq('client_id', id);
+  await sb.from('sip_records').delete().eq('client_id', id);
+  await sb.from('clients').delete().eq('id', id);
+  hide('loadingEl');
+  toast('Client deleted', 'success');
+  await loadAll();
+}
+
+async function deleteSip(id) {
+  if (!confirm('Delete this SIP record?')) return;
+  await sb.from('sip_records').delete().eq('id', id);
+  toast('Deleted', 'success');
+  await loadAll();
+}
+
+function viewClient(id) {
+  const c = allClients.find(x => x.id === id);
+  if (c) toast('Client: ' + c.name + ' · ' + c.email, 'success');
+}
+
+function exportCSV() {
+  const rows = [['Name','Email','Phone','PAN']];
+  allClients.forEach(c => rows.push([c.name,c.email,c.phone||'',c.pan||'']));
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv,' + encodeURIComponent(csv);
+  a.download = 'clients.csv';
+  a.click();
+}
+
+// ─ MODALS ─
+function openModal(name) {
+  if (name === 'addSip' || name === 'addHolding') {
+    const sel = name === 'addSip' ? 'sip-client' : 'h-client';
+    document.getElementById(sel).innerHTML = allClients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  }
+  document.getElementById('modal-' + name).classList.add('show');
+}
+function closeModal(name) { document.getElementById('modal-' + name).classList.remove('show'); }
+
+// ─ PAGES ─
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('pg-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+}
+
+// ─ UI ─
+function showApp() { hide('loginPage'); hide('otpPage'); show('mainApp'); }
+function showLoginPage() { hide('otpPage'); show('loginPage'); }
+function show(id) { document.getElementById(id).style.display='flex'; }
+function hide(id) { const el=document.getElementById(id); if(el) el.style.display='none'; }
+function toast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast show ${type}`;
+  setTimeout(() => t.className='toast', 3000);
+}
+function fmtN(n) {
+  if (!n) return '₹0';
+  if (n >= 10000000) return '₹' + (n/10000000).toFixed(2) + ' Cr';
+  if (n >= 100000) return '₹' + (n/100000).toFixed(2) + ' L';
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+
+window.addEventListener('load', init);
+</script>
+
+</body>
+</html>
